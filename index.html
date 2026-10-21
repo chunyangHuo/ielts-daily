@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>雅思每日舱</title>
+    <style>
+        :root {
+            --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --sub: #a0a0a0; 
+            --accent: #00e676; --danger: #ff5252;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, sans-serif; }
+        body { background: var(--bg); color: var(--text); padding: 15px; line-height: 1.6; padding-bottom: 50px;}
+        
+        /* 顶部状态栏 */
+        .top-bar { display: flex; justify-content: space-between; background: var(--card); padding: 15px; border-radius: 12px; margin-bottom: 15px; font-size: 14px; font-weight: bold; }
+        .top-bar span { color: var(--accent); }
+
+        /* 卡片通用样式 */
+        .card { background: var(--card); border-radius: 12px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+        .card h2 { font-size: 16px; margin-bottom: 15px; color: var(--accent); border-bottom: 1px solid #333; padding-bottom: 10px; }
+        
+        /* 阅读区 */
+        .reading-text { font-size: 15px; margin-bottom: 15px; }
+        .reading-text p { margin-bottom: 10px; }
+        
+        /* 输入框 */
+        .input-group { display: flex; gap: 10px; margin-bottom: 10px; }
+        .input-group input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #333; background: #000; color: white; outline: none; }
+        .input-group button { padding: 10px 15px; background: var(--accent); color: #000; border: none; border-radius: 8px; font-weight: bold; }
+        
+        /* 任务打卡区 */
+        .task-item { display: flex; align-items: center; padding: 15px 0; border-bottom: 1px dashed #333; cursor: pointer; }
+        .task-item:last-child { border-bottom: none; }
+        .task-item.completed { opacity: 0.5; text-decoration: line-through; }
+        .checkbox { width: 24px; height: 24px; border: 2px solid var(--sub); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 15px; }
+        .task-item.completed .checkbox { background: var(--accent); border-color: var(--accent); }
+        .checkbox::after { content: "✓"; color: #000; font-weight: bold; display: none; }
+        .task-item.completed .checkbox::after { display: block; }
+        .task-content { flex: 1; }
+        .task-title { font-weight: bold; font-size: 15px; }
+        .task-desc { font-size: 12px; color: var(--sub); margin-top: 3px; }
+        
+        /* 单词闪卡 */
+        .flashcard { background: #2a2a2a; border-radius: 10px; padding: 20px; text-align: center; margin-bottom: 10px; cursor: pointer; border: 1px solid #444; transition: transform 0.1s; }
+        .flashcard:active { transform: scale(0.98); }
+        .flashcard .en { font-size: 22px; font-weight: bold; color: var(--accent); }
+        .flashcard .zh { font-size: 16px; margin-top: 10px; display: none; }
+        .flashcard.show-zh .zh { display: block; }
+        
+        .btn { width: 100%; padding: 12px; background: #333; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; margin-top: 10px; cursor: pointer; }
+        .btn-green { background: var(--accent); color: #000; }
+        .btn-red { background: var(--danger); color: white; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- 顶部状态 -->
+    <div class="top-bar">
+        <div>🔥 连续打卡: <span id="streak">0</span> 天</div>
+        <div>距离考试: <span id="countdown">--</span> 天</div>
+    </div>
+
+    <!-- 1. 单词复习区 (自动复习前几天存的生词) -->
+    <div class="card" id="review-section">
+        <h2>🧠 生词闪卡复习</h2>
+        <div id="flashcard-container">
+            <div class="flashcard" onclick="this.classList.toggle('show-zh')">
+                <div class="en" id="fc-en">Word</div>
+                <div class="zh" id="fc-zh">释义</div>
+                <div style="font-size:12px; color:#888; margin-top:15px;">(点击卡片翻转)</div>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button class="btn btn-green" onclick="nextCard(true)">认识</button>
+                <button class="btn btn-red" onclick="nextCard(false)">不认识</button>
+            </div>
+        </div>
+        <div id="no-review" class="hidden" style="text-align:center; color:var(--sub); padding: 20px 0;">
+            今日没有待复习的生词，太棒了！
+        </div>
+    </div>
+
+    <!-- 2. 阅读与生词收集区 -->
+    <div class="card">
+        <h2>📖 今日阅读 & 生词收集</h2>
+        <div class="reading-text" id="daily-reading">
+            <!-- 默认内容，后续会被云端替换 -->
+            <p><b>[Reading]</b> Loading daily content from GitHub...</p>
+            <p>If you see this, it means your app is successfully running! You can read the text here. When you find a new word, add it to your vocabulary list below.</p>
+        </div>
+        <div class="input-group">
+            <input type="text" id="new-word-en" placeholder="生词 (英文)">
+            <input type="text" id="new-word-zh" placeholder="释义 (中文)">
+            <button onclick="addWord()">加入</button>
+        </div>
+    </div>
+
+    <!-- 3. 任务打卡区 -->
+    <div class="card">
+        <h2>✅ 每日任务打卡</h2>
+        
+        <div class="task-item" onclick="toggleTask(this, 'listening')">
+            <div class="checkbox"></div>
+            <div class="task-content">
+                <div class="task-title">🎧 听力练习</div>
+                <div class="task-desc">通勤/拼乐高时听 BBC 或 雅思听力</div>
+            </div>
+        </div>
+        
+        <div class="task-item" onclick="toggleTask(this, 'speaking')">
+            <div class="checkbox"></div>
+            <div class="task-content">
+                <div class="task-title">🗣️ 口语跟读 (Shadowing)</div>
+                <div class="task-desc">模仿原音读3遍，注意嘴型和语气</div>
+            </div>
+        </div>
+        
+        <div class="task-item" onclick="toggleTask(this, 'writing')">
+            <div class="checkbox"></div>
+            <div class="task-content">
+                <div class="task-title">✍️ 写作练习</div>
+                <div class="task-desc">周末集中完成/摘抄好句</div>
+            </div>
+        </div>
+    </div>
+
+    <button class="btn" onclick="resetApp()" style="background:transparent; border:1px solid #555; color:#555; margin-top:20px;">重置今日状态 (仅供测试)</button>
+
+    <script>
+        // --- 1. 设置考试日期 (你可以自己改) ---
+        const examDate = new Date("2025-06-15T00:00:00").getTime();
+        function updateCountdown() {
+            const days = Math.ceil((examDate - new Date().getTime()) / (1000 * 60 * 60 * 24));
+            document.getElementById("countdown").innerText = days > 0 ? days : 0;
+        }
+        updateCountdown();
+
+        // --- 2. 打卡逻辑 (本地存储) ---
+        const todayStr = new Date().toDateString();
+        
+        function loadTasks() {
+            ['listening', 'speaking', 'writing'].forEach(task => {
+                if(localStorage.getItem(`task_${task}_${todayStr}`) === 'true') {
+                    const el = document.querySelector(`.task-item[onclick*="${task}"]`);
+                    if(el) el.classList.add('completed');
+                }
+            });
+            
+            // 连续打卡天数计算 (简单版)
+            let streak = localStorage.getItem('streak_count') || 1;
+            document.getElementById('streak').innerText = streak;
+        }
+
+        function toggleTask(el, taskName) {
+            el.classList.toggle('completed');
+            const isCompleted = el.classList.contains('completed');
+            localStorage.setItem(`task_${taskName}_${todayStr}`, isCompleted);
+        }
+
+        // --- 3. 生词本系统 ---
+        // 存储格式: [{en: 'word', zh: '释义'}, ...]
+        let vocabulary = JSON.parse(localStorage.getItem('my_vocab') || '[]');
+        let reviewPool = []; // 需要复习的池子
+        let currentCard = null;
+
+        function updateReviewUI() {
+            // 每天抽取最多 5 个词复习（这里为了演示，如果有数据就抽）
+            if (vocabulary.length > 0) {
+                reviewPool = [...vocabulary]; // 真实情况应按时间算法抽，先简化为全部过一遍
+                document.getElementById('review-section').classList.remove('hidden');
+                document.getElementById('no-review').classList.add('hidden');
+                loadNextCard();
+            } else {
+                document.getElementById('flashcard-container').classList.add('hidden');
+                document.getElementById('no-review').classList.remove('hidden');
+            }
+        }
+
+        function loadNextCard() {
+            if (reviewPool.length === 0) {
+                document.getElementById('flashcard-container').innerHTML = '<div style="text-align:center; padding:20px; color:var(--accent)">今日复习完成！🎉</div>';
+                return;
+            }
+            currentCard = reviewPool[0];
+            document.getElementById('fc-en').innerText = currentCard.en;
+            document.getElementById('fc-zh').innerText = currentCard.zh;
+            document.querySelector('.flashcard').classList.remove('show-zh'); // 重置翻转
+        }
+
+        function nextCard(isKnown) {
+            if (!isKnown) {
+                // 如果选了不认识，可以把它再塞回池子后面 (稍后再考一次)
+                reviewPool.push(reviewPool.shift());
+            } else {
+                reviewPool.shift(); // 认识就移出池子
+            }
+            loadNextCard();
+        }
+
+        function addWord() {
+            const en = document.getElementById('new-word-en').value.trim();
+            const zh = document.getElementById('new-word-zh').value.trim();
+            if (en && zh) {
+                vocabulary.push({ en: en, zh: zh });
+                localStorage.setItem('my_vocab', JSON.stringify(vocabulary));
+                document.getElementById('new-word-en').value = '';
+                document.getElementById('new-word-zh').value = '';
+                alert('已加入生词本！明天会自动出现在复习闪卡中。');
+                updateReviewUI(); // 更新界面
+            } else {
+                alert('请填写完整的英文和中文释义');
+            }
+        }
+
+        function resetApp() {
+            if(confirm('确定清空今天的打卡记录吗？(生词本会保留)')) {
+                ['listening', 'speaking', 'writing'].forEach(task => {
+                    localStorage.removeItem(`task_${task}_${todayStr}`);
+                });
+                document.querySelectorAll('.task-item').forEach(el => el.classList.remove('completed'));
+            }
+        }
+
+        // --- 4. 初始化 ---
+        window.onload = function() {
+            loadTasks();
+            updateReviewUI();
+            
+            // 云端拉取数据预留接口 (后续教你怎么填)
+            // fetch('你的GitHub数据文件链接')
+            //   .then(res => res.json())
+            //   .then(data => { document.getElementById('daily-reading').innerHTML = data.reading; })
+        }
+    </script>
+</body>
+</html>
