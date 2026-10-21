@@ -32,16 +32,17 @@
         .input-group button { padding: 10px 15px; background: var(--accent); color: #000; border: none; border-radius: 8px; font-weight: bold; }
         
         /* 任务打卡区 */
-        .task-item { display: flex; align-items: center; padding: 15px 0; border-bottom: 1px dashed #333; cursor: pointer; }
+        .task-item { display: flex; align-items: flex-start; padding: 15px 0; border-bottom: 1px dashed #333; cursor: pointer; }
         .task-item:last-child { border-bottom: none; }
         .task-item.completed { opacity: 0.5; text-decoration: line-through; }
-        .checkbox { width: 24px; height: 24px; border: 2px solid var(--sub); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 15px; }
+        .checkbox { width: 24px; height: 24px; flex-shrink: 0; border: 2px solid var(--sub); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 15px; margin-top: 2px;}
         .task-item.completed .checkbox { background: var(--accent); border-color: var(--accent); }
         .checkbox::after { content: "✓"; color: #000; font-weight: bold; display: none; }
         .task-item.completed .checkbox::after { display: block; }
         .task-content { flex: 1; }
         .task-title { font-weight: bold; font-size: 15px; }
-        .task-desc { font-size: 12px; color: var(--sub); margin-top: 3px; }
+        .task-desc { font-size: 13px; color: #ccc; margin-top: 5px; line-height: 1.5; background: #2a2a2a; padding: 10px; border-radius: 6px;}
+        .task-desc a { color: var(--accent); text-decoration: none; font-weight: bold; }
         
         /* 单词闪卡 */
         .flashcard { background: #2a2a2a; border-radius: 10px; padding: 20px; text-align: center; margin-bottom: 10px; cursor: pointer; border: 1px solid #444; transition: transform 0.1s; }
@@ -64,7 +65,7 @@
         <div>距离考试: <span id="countdown">--</span> 天</div>
     </div>
 
-    <!-- 1. 单词复习区 (自动复习前几天存的生词) -->
+    <!-- 1. 单词复习区 -->
     <div class="card" id="review-section">
         <h2>🧠 生词闪卡复习</h2>
         <div id="flashcard-container">
@@ -87,9 +88,7 @@
     <div class="card">
         <h2>📖 今日阅读 & 生词收集</h2>
         <div class="reading-text" id="daily-reading">
-            <!-- 默认内容，后续会被云端替换 -->
-            <p><b>[Reading]</b> Loading daily content from GitHub...</p>
-            <p>If you see this, it means your app is successfully running! You can read the text here. When you find a new word, add it to your vocabulary list below.</p>
+            <p><b>[Reading]</b> 正在从云端加载内容...</p>
         </div>
         <div class="input-group">
             <input type="text" id="new-word-en" placeholder="生词 (英文)">
@@ -102,19 +101,19 @@
     <div class="card">
         <h2>✅ 每日任务打卡</h2>
         
-        <div class="task-item" onclick="toggleTask(this, 'listening')">
+        <div class="task-item" id="task-listening" onclick="toggleTask(this, 'listening')">
             <div class="checkbox"></div>
             <div class="task-content">
                 <div class="task-title">🎧 听力练习</div>
-                <div class="task-desc">通勤/拼乐高时听 BBC 或 雅思听力</div>
+                <div class="task-desc" id="desc-listening">正在加载今日听力...</div>
             </div>
         </div>
         
-        <div class="task-item" onclick="toggleTask(this, 'speaking')">
+        <div class="task-item" id="task-speaking" onclick="toggleTask(this, 'speaking')">
             <div class="checkbox"></div>
             <div class="task-content">
-                <div class="task-title">🗣️ 口语跟读 (Shadowing)</div>
-                <div class="task-desc">模仿原音读3遍，注意嘴型和语气</div>
+                <div class="task-title">🗣️ 口语跟读</div>
+                <div class="task-desc" id="desc-speaking">正在加载今日跟读原句...</div>
             </div>
         </div>
         
@@ -122,7 +121,7 @@
             <div class="checkbox"></div>
             <div class="task-content">
                 <div class="task-title">✍️ 写作练习</div>
-                <div class="task-desc">周末集中完成/摘抄好句</div>
+                <div class="task-desc" id="desc-writing">正在加载今日写作任务...</div>
             </div>
         </div>
     </div>
@@ -130,7 +129,7 @@
     <button class="btn" onclick="resetApp()" style="background:transparent; border:1px solid #555; color:#555; margin-top:20px;">重置今日状态 (仅供测试)</button>
 
     <script>
-        // --- 1. 设置考试日期 (你可以自己改) ---
+        // --- 1. 设置考试日期 ---
         const examDate = new Date("2025-06-15T00:00:00").getTime();
         function updateCountdown() {
             const days = Math.ceil((examDate - new Date().getTime()) / (1000 * 60 * 60 * 24));
@@ -138,7 +137,7 @@
         }
         updateCountdown();
 
-        // --- 2. 打卡逻辑 (本地存储) ---
+        // --- 2. 打卡逻辑 ---
         const todayStr = new Date().toDateString();
         
         function loadTasks() {
@@ -148,28 +147,25 @@
                     if(el) el.classList.add('completed');
                 }
             });
-            
-            // 连续打卡天数计算 (简单版)
             let streak = localStorage.getItem('streak_count') || 1;
             document.getElementById('streak').innerText = streak;
         }
 
+        // 点击任务时，如果是点里面的链接，不触发打卡
         function toggleTask(el, taskName) {
+            if(event.target.tagName.toLowerCase() === 'a') return; // 放行点击链接
             el.classList.toggle('completed');
-            const isCompleted = el.classList.contains('completed');
-            localStorage.setItem(`task_${taskName}_${todayStr}`, isCompleted);
+            localStorage.setItem(`task_${taskName}_${todayStr}`, el.classList.contains('completed'));
         }
 
         // --- 3. 生词本系统 ---
-        // 存储格式: [{en: 'word', zh: '释义'}, ...]
         let vocabulary = JSON.parse(localStorage.getItem('my_vocab') || '[]');
-        let reviewPool = []; // 需要复习的池子
+        let reviewPool = []; 
         let currentCard = null;
 
         function updateReviewUI() {
-            // 每天抽取最多 5 个词复习（这里为了演示，如果有数据就抽）
             if (vocabulary.length > 0) {
-                reviewPool = [...vocabulary]; // 真实情况应按时间算法抽，先简化为全部过一遍
+                reviewPool = [...vocabulary]; 
                 document.getElementById('review-section').classList.remove('hidden');
                 document.getElementById('no-review').classList.add('hidden');
                 loadNextCard();
@@ -187,15 +183,14 @@
             currentCard = reviewPool[0];
             document.getElementById('fc-en').innerText = currentCard.en;
             document.getElementById('fc-zh').innerText = currentCard.zh;
-            document.querySelector('.flashcard').classList.remove('show-zh'); // 重置翻转
+            document.querySelector('.flashcard').classList.remove('show-zh');
         }
 
         function nextCard(isKnown) {
             if (!isKnown) {
-                // 如果选了不认识，可以把它再塞回池子后面 (稍后再考一次)
                 reviewPool.push(reviewPool.shift());
             } else {
-                reviewPool.shift(); // 认识就移出池子
+                reviewPool.shift(); 
             }
             loadNextCard();
         }
@@ -208,15 +203,15 @@
                 localStorage.setItem('my_vocab', JSON.stringify(vocabulary));
                 document.getElementById('new-word-en').value = '';
                 document.getElementById('new-word-zh').value = '';
-                alert('已加入生词本！明天会自动出现在复习闪卡中。');
-                updateReviewUI(); // 更新界面
+                alert('已加入生词本！明天会自动出现。');
+                updateReviewUI(); 
             } else {
                 alert('请填写完整的英文和中文释义');
             }
         }
 
         function resetApp() {
-            if(confirm('确定清空今天的打卡记录吗？(生词本会保留)')) {
+            if(confirm('确定清空今天的打卡记录吗？')) {
                 ['listening', 'speaking', 'writing'].forEach(task => {
                     localStorage.removeItem(`task_${task}_${todayStr}`);
                 });
@@ -224,17 +219,30 @@
             }
         }
 
-        // --- 4. 初始化 ---
+        // --- 4. 初始化与云端数据拉取 ---
         window.onload = function() {
             loadTasks();
             updateReviewUI();
             
-                     // 从 Gist 自动拉取今天的内容
+            // 从 Gist 拉取数据
             fetch('https://gist.githack.com/chunyangHuo/52271c230940823c085402791faabe46/raw/data.json')
                 .then(res => res.json())
                 .then(data => { 
+                    // 1. 更新阅读
                     if(data.reading) {
                         document.getElementById('daily-reading').innerHTML = data.reading; 
+                    }
+                    // 2. 更新听力
+                    if(data.listening) {
+                        document.getElementById('desc-listening').innerHTML = `<a href="${data.listening.link}" target="_blank">▶ 点击前往收听：${data.listening.title}</a>`;
+                    }
+                    // 3. 更新口语
+                    if(data.speaking) {
+                        document.getElementById('desc-speaking').innerText = `跟读原句："${data.speaking}"`;
+                    }
+                    // 4. 更新写作
+                    if(data.writing) {
+                        document.getElementById('desc-writing').innerText = data.writing;
                     }
                 })
                 .catch(err => console.log('数据拉取失败，请检查网络或链接', err));
