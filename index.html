@@ -229,10 +229,15 @@
             loadTasks();
             updateReviewUI();
             
-            // 云端拉取数据预留接口 (后续教你怎么填)
-            // fetch('你的GitHub数据文件链接')
-            //   .then(res => res.json())
-            //   .then(data => { document.getElementById('daily-reading').innerHTML = data.reading; })
+                     // 从 Gist 自动拉取今天的内容
+            fetch('https://gist.githack.com/chunyangHuo/52271c230940823c085402791faabe46/raw/data.json')
+                .then(res => res.json())
+                .then(data => { 
+                    if(data.reading) {
+                        document.getElementById('daily-reading').innerHTML = data.reading; 
+                    }
+                })
+                .catch(err => console.log('数据拉取失败，请检查网络或链接', err));
         }
     </script>
 </body>
